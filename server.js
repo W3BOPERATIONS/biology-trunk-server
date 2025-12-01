@@ -8,15 +8,61 @@ dotenv.config()
 
 const app = express()
 
+// **Frontend URLs for CORS**
+const allowedOrigins = [
+  "https://biology-trunk-client.vercel.app", // Your deployed frontend
+  "http://localhost:3000",                   // Local development
+  "http://localhost:5173",                   // Vite dev server
+  "https://biology-trunk.vercel.app",        // Alternative domain
+  "https://*.vercel.app"                     // All Vercel subdomains
+]
+
+// **Enhanced CORS Configuration**
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true)
+    
+    if (allowedOrigins.some(allowedOrigin => {
+      if (allowedOrigin.includes('*')) {
+        // Handle wildcard subdomains
+        const regex = new RegExp(allowedOrigin.replace('*', '.*'))
+        return regex.test(origin)
+      }
+      return allowedOrigin === origin
+    })) {
+      callback(null, true)
+    } else {
+      console.log(`🚫 CORS blocked: ${origin}`)
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
+  credentials: true, // Allow cookies/sessions
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin'
+  ],
+  exposedHeaders: ['Content-Length', 'Authorization'],
+  maxAge: 86400 // 24 hours
+}
+
 // Middleware
-app.use(cors())
+app.use(cors(corsOptions))
 app.use(express.json())
 app.use(express.urlencoded({ limit: "50mb", extended: true }))
+
+// **Add CORS headers for preflight requests**
+app.options('*', cors(corsOptions))
 
 // **Log environment variables (safely)**
 console.log("🔧 Environment Configuration:")
 console.log("NODE_ENV:", process.env.NODE_ENV)
 console.log("PORT:", process.env.PORT)
+console.log("Frontend URL:", "https://biology-trunk-client.vercel.app")
 console.log("MONGODB_URI:", process.env.MONGODB_URI ? 
   process.env.MONGODB_URI.replace(/(mongodb\+srv:\/\/)([^:]+):([^@]+)@/, '$1***:***@') : 
   "Not set"
@@ -218,6 +264,7 @@ app.get("/api/health", async (req, res) => {
   res.json({
     status: "API Server is Running",
     environment: process.env.NODE_ENV || 'development',
+    frontendUrl: "https://biology-trunk-client.vercel.app",
     timestamp: new Date().toISOString(),
     uptime: `${Math.floor(process.uptime())} seconds`,
     serverTime: new Date().toString(),
@@ -266,6 +313,7 @@ app.get("/api/test-connection", async (req, res) => {
     res.json({
       success: true,
       message: "🎉 MongoDB Connection Successful!",
+      frontendUrl: "https://biology-trunk-client.vercel.app",
       responseTime: `${endTime - startTime}ms`,
       details: {
         database: mongoose.connection.name,
@@ -289,6 +337,7 @@ app.get("/api/test-connection", async (req, res) => {
       message: error.message,
       currentState: mongoose.connection.readyState,
       environment: process.env.NODE_ENV,
+      frontendUrl: "https://biology-trunk-client.vercel.app",
       suggestions: [
         "1. Verify MONGODB_URI in Vercel environment variables",
         "2. Check MongoDB Atlas → Network Access → Add IP 0.0.0.0/0",
@@ -307,11 +356,13 @@ app.get("/api/status", (req, res) => {
     service: "EduTech Backend API",
     status: "operational",
     database: isDbConnected ? "connected" : "disconnected",
+    frontendUrl: "https://biology-trunk-client.vercel.app",
     timestamp: new Date().toISOString(),
     quickActions: {
       health: "/api/health",
       testConnection: "/api/test-connection",
-      reconnect: "/api/reconnect-db"
+      reconnect: "/api/reconnect-db",
+      frontend: "https://biology-trunk-client.vercel.app"
     }
   })
 })
@@ -337,6 +388,7 @@ app.get("/api/reconnect-db", async (req, res) => {
       res.json({
         success: true,
         message: "✅ Successfully reconnected to MongoDB",
+        frontendUrl: "https://biology-trunk-client.vercel.app",
         connectionState: mongoose.connection.readyState,
         host: mongoose.connection.host,
         database: mongoose.connection.name
@@ -345,6 +397,7 @@ app.get("/api/reconnect-db", async (req, res) => {
       res.status(500).json({
         success: false,
         message: "❌ Failed to reconnect to MongoDB",
+        frontendUrl: "https://biology-trunk-client.vercel.app",
         connectionState: mongoose.connection.readyState
       })
     }
@@ -353,9 +406,22 @@ app.get("/api/reconnect-db", async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message,
+      frontendUrl: "https://biology-trunk-client.vercel.app",
       connectionState: mongoose.connection.readyState
     })
   }
+})
+
+// **Frontend Connection Test Endpoint**
+app.get("/api/check-frontend", (req, res) => {
+  res.json({
+    success: true,
+    message: "Frontend is properly configured",
+    frontendUrl: "https://biology-trunk-client.vercel.app",
+    corsStatus: "enabled",
+    allowedMethods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    timestamp: new Date().toISOString()
+  })
 })
 
 // **Root Endpoint**
@@ -368,6 +434,7 @@ app.get("/", (req, res) => {
     status: {
       api: "running",
       database: isDbConnected ? "✅ connected" : "❌ disconnected",
+      frontend: "✅ https://biology-trunk-client.vercel.app",
       environment: process.env.NODE_ENV || "development"
     },
     endpoints: {
@@ -376,6 +443,7 @@ app.get("/", (req, res) => {
       health: "/api/health",
       testConnection: "/api/test-connection",
       reconnect: "/api/reconnect-db",
+      checkFrontend: "/api/check-frontend",
       users: "/api/users",
       courses: "/api/courses",
       enrollments: "/api/enrollments",
@@ -383,6 +451,7 @@ app.get("/", (req, res) => {
       notifications: "/api/notifications"
     },
     quickCheck: `Database is ${isDbConnected ? "CONNECTED" : "DISCONNECTED"}`,
+    frontendLink: "https://biology-trunk-client.vercel.app",
     timestamp: new Date().toISOString()
   })
 })
@@ -395,6 +464,7 @@ app.use((err, req, res, next) => {
     error: "Internal Server Error",
     message: err.message,
     databaseStatus: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+    frontendUrl: "https://biology-trunk-client.vercel.app",
     timestamp: new Date().toISOString()
   })
 })
@@ -403,11 +473,13 @@ app.use((err, req, res, next) => {
 app.use((req, res) => {
   res.status(404).json({
     error: "Endpoint not found",
+    frontendUrl: "https://biology-trunk-client.vercel.app",
     availableEndpoints: {
       root: "/",
       health: "/api/health",
       testConnection: "/api/test-connection",
-      status: "/api/status"
+      status: "/api/status",
+      checkFrontend: "/api/check-frontend"
     }
   })
 })
@@ -423,6 +495,7 @@ if (process.env.NODE_ENV !== 'production') {
     console.log(`\n🎯 Server Information:`)
     console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`)
     console.log(`   Server URL: http://localhost:${PORT}`)
+    console.log(`   Frontend URL: https://biology-trunk-client.vercel.app`)
     console.log(`   Health Check: http://localhost:${PORT}/api/health`)
     console.log(`   Test Connection: http://localhost:${PORT}/api/test-connection`)
     console.log(`\n📊 Waiting for database connection...`)

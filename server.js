@@ -17,11 +17,16 @@ app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({ limit: "50mb", extended: true }))
 
-// MongoDB Connection
-mongoose
-  .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/edutech")
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.log("MongoDB connection error:", err))
+// MongoDB Connection - Production mein sirf connect karo
+if (process.env.NODE_ENV !== 'test') {
+  mongoose
+    .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/edutech", {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    })
+    .then(() => console.log("MongoDB connected"))
+    .catch((err) => console.log("MongoDB connection error:", err))
+}
 
 // Routes
 app.use("/api/users", userRoutes)
@@ -32,10 +37,32 @@ app.use("/api/notifications", notificationRoutes)
 
 // Health check
 app.get("/api/health", (req, res) => {
-  res.json({ status: "Backend is running" })
+  res.json({ status: "Backend is running", env: process.env.NODE_ENV })
 })
 
-const PORT = process.env.PORT || 5000
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
+// Root endpoint
+app.get("/", (req, res) => {
+  res.json({ 
+    message: "EduTech Backend API",
+    endpoints: {
+      users: "/api/users",
+      courses: "/api/courses",
+      enrollments: "/api/enrollments",
+      content: "/api/content",
+      notifications: "/api/notifications",
+      health: "/api/health"
+    }
+  })
 })
+
+// Vercel ke liye export
+const port = process.env.PORT || 5000
+
+// Agar Vercel environment nahi hai, tab hi listen karo
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`)
+  })
+}
+
+export default app

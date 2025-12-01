@@ -2,11 +2,6 @@ import express from "express"
 import mongoose from "mongoose"
 import cors from "cors"
 import dotenv from "dotenv"
-import userRoutes from "./routes/userRoutes.js"
-import courseRoutes from "./routes/courseRoutes.js"
-import enrollmentRoutes from "./routes/enrollmentRoutes.js"
-import contentRoutes from "./routes/contentRoutes.js"
-import notificationRoutes from "./routes/notificationRoutes.js"
 
 dotenv.config()
 
@@ -17,44 +12,71 @@ app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({ limit: "50mb", extended: true }))
 
-// MongoDB Connection
-let mongoConnected = false
+// **IMPORTANT: Vercel-specific MongoDB connection**
+const connectDB = async () => {
+  if (mongoose.connection.readyState >= 1) {
+    console.log("Already connected to MongoDB")
+    return
+  }
 
-if (process.env.NODE_ENV !== 'test') {
-  mongoose
-    .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/edutech", {
+  try {
+    // Vercel पर MongoDB Atlas connection के लिए optimized settings
+    await mongoose.connect(process.env.MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 15000, // 15 seconds timeout
-      socketTimeoutMS: 45000, // 45 seconds socket timeout
-      connectTimeoutMS: 15000,
-      maxPoolSize: 10, // Connection pool size
+      serverSelectionTimeoutMS: 30000, // 30 seconds
+      socketTimeoutMS: 45000, // 45 seconds
+      connectTimeoutMS: 30000,
+      maxPoolSize: 5, // Vercel के लिए smaller pool
+      minPoolSize: 1,
+      ssl: true,
+      tlsAllowInvalidCertificates: false,
+      retryWrites: true,
+      w: 'majority'
     })
-    .then(() => {
-      console.log("MongoDB connected")
-      mongoConnected = true
-    })
-    .catch((err) => {
-      console.log("MongoDB connection error:", err)
-      mongoConnected = false
-    })
+    
+    console.log("✅ MongoDB connected successfully")
+    console.log(`Database: ${mongoose.connection.name}`)
+    console.log(`Host: ${mongoose.connection.host}`)
+    
+  } catch (error) {
+    console.error("❌ MongoDB connection failed:", error.message)
+    
+    // Log detailed error for debugging
+    if (error.name === 'MongoNetworkError') {
+      console.error("Network error - Check MongoDB Atlas IP whitelist")
+    } else if (error.name === 'MongoServerSelectionError') {
+      console.error("Server selection error - Check connection string")
+    } else if (error.name === 'MongooseServerSelectionError') {
+      console.error("Mongoose server selection error")
+    }
+  }
 }
 
-// MongoDB connection state monitoring
-mongoose.connection.on('connected', () => {
-  console.log('Mongoose connected to DB')
-  mongoConnected = true
+// Vercel functions में connection establish करें
+if (process.env.NODE_ENV === 'production') {
+  connectDB().catch(err => console.error("Initial connection error:", err))
+}
+
+// Middleware to ensure DB connection
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    console.log("DB not connected, attempting to connect...")
+    try {
+      await connectDB()
+    } catch (error) {
+      console.error("Failed to connect DB in middleware:", error.message)
+    }
+  }
+  next()
 })
 
-mongoose.connection.on('error', (err) => {
-  console.log('Mongoose connection error:', err)
-  mongoConnected = false
-})
-
-mongoose.connection.on('disconnected', () => {
-  console.log('Mongoose disconnected')
-  mongoConnected = false
-})
+// Import routes
+import userRoutes from "./routes/userRoutes.js"
+import courseRoutes from "./routes/courseRoutes.js"
+import enrollmentRoutes from "./routes/enrollmentRoutes.js"
+import contentRoutes from "./routes/contentRoutes.js"
+import notificationRoutes from "./routes/notificationRoutes.js"
 
 // Routes
 app.use("/api/users", userRoutes)
@@ -63,110 +85,132 @@ app.use("/api/enrollments", enrollmentRoutes)
 app.use("/api/content", contentRoutes)
 app.use("/api/notifications", notificationRoutes)
 
-// Health check with DB status
-app.get("/api/health", (req, res) => {
+// Enhanced Health check
+app.get("/api/health", async (req, res) => {
   const dbState = mongoose.connection.readyState
-  const dbStates = {
-    0: 'disconnected',
-    1: 'connected',
-    2: 'connecting',
-    3: 'disconnecting'
+  const states = ['disconnected', 'connected', 'connecting', 'disconnecting']
+  
+  // Try to ping database if connected
+  let dbPing = "not attempted"
+  if (dbState === 1) {
+    try {
+      const start = Date.now()
+      await mongoose.connection.db.admin().ping()
+      const end = Date.now()
+      dbPing = `success (${end - start}ms)`
+    } catch (pingErr) {
+      dbPing = `failed: ${pingErr.message}`
+    }
   }
   
-  res.json({ 
-    status: "Backend is running", 
-    env: process.env.NODE_ENV,
+  res.json({
+    status: "API is running",
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
     database: {
-      status: dbStates[dbState],
+      status: states[dbState],
       readyState: dbState,
-      connected: dbState === 1
+      ping: dbPing,
+      host: mongoose.connection.host || 'N/A',
+      name: mongoose.connection.name || 'N/A'
     },
-    timestamp: new Date().toISOString()
+    memory: process.memoryUsage()
   })
 })
 
-// Detailed DB status check endpoint
-app.get("/api/db-status", async (req, res) => {
+// Test MongoDB connection endpoint
+app.get("/api/test-db", async (req, res) => {
   try {
-    const dbState = mongoose.connection.readyState
-    const dbStates = {
-      0: 'disconnected',
-      1: 'connected',
-      2: 'connecting',
-      3: 'disconnecting'
+    console.log("Testing MongoDB connection...")
+    
+    if (!process.env.MONGODB_URI) {
+      return res.status(500).json({
+        error: "MONGODB_URI environment variable is not set",
+        message: "Please set MONGODB_URI in Vercel environment variables"
+      })
     }
     
-    // Try to ping the database to check if it's actually responsive
-    let pingResult = null
-    if (dbState === 1) {
-      try {
-        await mongoose.connection.db.admin().ping()
-        pingResult = "success"
-      } catch (pingError) {
-        pingResult = `failed: ${pingError.message}`
-      }
+    // Hide password in logs
+    const safeUri = process.env.MONGODB_URI.replace(
+      /mongodb(\+srv)?:\/\/[^:]+:[^@]+@/,
+      'mongodb$1://***:***@'
+    )
+    
+    console.log("Using connection string:", safeUri)
+    
+    // Test connection
+    const startTime = Date.now()
+    
+    if (mongoose.connection.readyState !== 1) {
+      await connectDB()
     }
+    
+    // Run a simple query to test
+    const collections = await mongoose.connection.db.listCollections().toArray()
+    const endTime = Date.now()
     
     res.json({
-      database: {
-        status: dbStates[dbState],
-        readyState: dbState,
-        connected: dbState === 1,
-        host: mongoose.connection.host || 'N/A',
-        name: mongoose.connection.name || 'N/A',
-        ping: pingResult,
-        models: Object.keys(mongoose.models || {}),
-        connectionString: process.env.MONGODB_URI ? 
-          process.env.MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):([^@]+)@/, 'mongodb+srv://***:***@') : 
-          'Using local MongoDB'
-      },
-      environment: process.env.NODE_ENV,
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime()
+      success: true,
+      message: "✅ Database connection successful",
+      connectionTime: `${endTime - startTime}ms`,
+      database: mongoose.connection.name,
+      host: mongoose.connection.host,
+      collections: collections.map(c => c.name),
+      connectionState: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState],
+      environment: process.env.NODE_ENV
     })
+    
   } catch (error) {
+    console.error("Database test failed:", error)
     res.status(500).json({
-      error: "Error checking DB status",
+      success: false,
+      error: error.name,
       message: error.message,
-      database: {
-        connected: false,
-        error: error.message
-      }
+      suggestion: "Check: 1) MONGODB_URI in Vercel env vars, 2) MongoDB Atlas IP whitelist (0.0.0.0/0), 3) Network connectivity"
     })
   }
 })
 
-// Root endpoint with connection info
+// Simple root endpoint
 app.get("/", (req, res) => {
-  const dbState = mongoose.connection.readyState
-  const isConnected = dbState === 1
-  
-  res.json({ 
+  res.json({
     message: "EduTech Backend API",
-    status: {
-      api: "running",
-      database: isConnected ? "connected" : "disconnected"
-    },
+    status: "running",
+    database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
     endpoints: {
-      users: "/api/users",
-      courses: "/api/courses",
-      enrollments: "/api/enrollments",
-      content: "/api/content",
-      notifications: "/api/notifications",
       health: "/api/health",
-      dbStatus: "/api/db-status"
+      testDb: "/api/test-db",
+      users: "/api/users",
+      courses: "/api/courses"
     }
   })
 })
 
-// Vercel ke liye export
-const port = process.env.PORT || 5000
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack)
+  res.status(500).json({
+    error: "Something went wrong!",
+    message: err.message,
+    dbConnected: mongoose.connection.readyState === 1
+  })
+})
 
-// Agar Vercel environment nahi hai, tab hi listen karo
+// Server setup
+const PORT = process.env.PORT || 5000
+
+// Vercel के लिए export
+export default app
+
+// Local development के लिए
 if (process.env.NODE_ENV !== 'production') {
-  app.listen(port, () => {
-    console.log(`Server running on port ${port}`)
+  connectDB().then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`)
+      console.log(`📊 Database: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`)
+    })
+  }).catch(err => {
+    console.error("Failed to start server:", err)
   })
 }
-
-export default app

@@ -24,6 +24,12 @@ const EnrollmentSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  completedContent: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Content",
+    },
+  ],
 })
 
 const Enrollment = mongoose.model("Enrollment", EnrollmentSchema)

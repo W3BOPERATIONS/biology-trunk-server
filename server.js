@@ -11,43 +11,39 @@ const app = express()
 // **Frontend URLs for CORS**
 const allowedOrigins = [
   "https://biology-trunk-client.vercel.app", // Your deployed frontend
-  "http://localhost:3000",                   // Local development
-  "http://localhost:5173",                   // Vite dev server
-  "https://biology-trunk.vercel.app",        // Alternative domain
-  "https://*.vercel.app"                     // All Vercel subdomains
+  "http://localhost:3000", // Local development
+  "http://localhost:5173", // Vite dev server
+  "https://biology-trunk.vercel.app", // Alternative domain
+  "https://*.vercel.app", // All Vercel subdomains
 ]
 
 // **Enhanced CORS Configuration**
 const corsOptions = {
-  origin: function (origin, callback) {
+  origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true)
-    
-    if (allowedOrigins.some(allowedOrigin => {
-      if (allowedOrigin.includes('*')) {
-        // Handle wildcard subdomains
-        const regex = new RegExp(allowedOrigin.replace('*', '.*'))
-        return regex.test(origin)
-      }
-      return allowedOrigin === origin
-    })) {
+
+    if (
+      allowedOrigins.some((allowedOrigin) => {
+        if (allowedOrigin.includes("*")) {
+          // Handle wildcard subdomains
+          const regex = new RegExp(allowedOrigin.replace("*", ".*"))
+          return regex.test(origin)
+        }
+        return allowedOrigin === origin
+      })
+    ) {
       callback(null, true)
     } else {
       console.log(`🚫 CORS blocked: ${origin}`)
-      callback(new Error('Not allowed by CORS'))
+      callback(new Error("Not allowed by CORS"))
     }
   },
   credentials: true, // Allow cookies/sessions
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'X-Requested-With',
-    'Accept',
-    'Origin'
-  ],
-  exposedHeaders: ['Content-Length', 'Authorization'],
-  maxAge: 86400 // 24 hours
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
+  exposedHeaders: ["Content-Length", "Authorization"],
+  maxAge: 86400, // 24 hours
 }
 
 // Middleware
@@ -56,16 +52,18 @@ app.use(express.json())
 app.use(express.urlencoded({ limit: "50mb", extended: true }))
 
 // **Add CORS headers for preflight requests**
-app.options('*', cors(corsOptions))
+app.options("*", cors(corsOptions))
 
 // **Log environment variables (safely)**
 console.log("🔧 Environment Configuration:")
 console.log("NODE_ENV:", process.env.NODE_ENV)
 console.log("PORT:", process.env.PORT)
 console.log("Frontend URL:", "https://biology-trunk-client.vercel.app")
-console.log("MONGODB_URI:", process.env.MONGODB_URI ? 
-  process.env.MONGODB_URI.replace(/(mongodb\+srv:\/\/)([^:]+):([^@]+)@/, '$1***:***@') : 
-  "Not set"
+console.log(
+  "MONGODB_URI:",
+  process.env.MONGODB_URI
+    ? process.env.MONGODB_URI.replace(/(mongodb\+srv:\/\/)([^:]+):([^@]+)@/, "$1***:***@")
+    : "Not set",
 )
 
 // **MongoDB Connection Handler**
@@ -83,7 +81,7 @@ const connectToDatabase = async () => {
   // If already connecting, wait
   if (isConnecting) {
     console.log("⏳ Already connecting to MongoDB, waiting...")
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    await new Promise((resolve) => setTimeout(resolve, 2000))
     return mongoose.connection.readyState === 1
   }
 
@@ -108,11 +106,11 @@ const connectToDatabase = async () => {
       maxPoolSize: 10,
       minPoolSize: 2,
       retryWrites: true,
-      w: 'majority',
+      w: "majority",
       ssl: true,
       tls: true,
       // Your specific appName parameter
-      appName: "Cluster0"
+      appName: "Cluster0",
     }
 
     // Connect to MongoDB
@@ -121,52 +119,51 @@ const connectToDatabase = async () => {
     console.log("✅ MongoDB Connected Successfully!")
     console.log(`📊 Database: ${mongoose.connection.name}`)
     console.log(`🔗 Host: ${mongoose.connection.host}`)
-    console.log(`👤 User: ${mongoose.connection.user || 'N/A'}`)
+    console.log(`👤 User: ${mongoose.connection.user || "N/A"}`)
 
     // Set up connection event handlers
-    mongoose.connection.on('connected', () => {
-      console.log('✅ Mongoose connected to DB')
+    mongoose.connection.on("connected", () => {
+      console.log("✅ Mongoose connected to DB")
       isConnecting = false
     })
 
-    mongoose.connection.on('error', (err) => {
-      console.error('❌ Mongoose connection error:', err.message)
+    mongoose.connection.on("error", (err) => {
+      console.error("❌ Mongoose connection error:", err.message)
       isConnecting = false
     })
 
-    mongoose.connection.on('disconnected', () => {
-      console.log('⚠️ Mongoose disconnected')
+    mongoose.connection.on("disconnected", () => {
+      console.log("⚠️ Mongoose disconnected")
       isConnecting = false
     })
 
-    mongoose.connection.on('reconnected', () => {
-      console.log('🔁 Mongoose reconnected')
+    mongoose.connection.on("reconnected", () => {
+      console.log("🔁 Mongoose reconnected")
       isConnecting = false
     })
 
     return true
-
   } catch (error) {
     console.error("❌ MongoDB Connection Failed:", error.message)
-    
+
     // Specific error handling
-    if (error.name === 'MongoNetworkError') {
+    if (error.name === "MongoNetworkError") {
       console.log("🔧 Fix: Check MongoDB Atlas Network Access - Add IP 0.0.0.0/0")
-    } else if (error.message.includes('auth failed')) {
+    } else if (error.message.includes("auth failed")) {
       console.log("🔧 Fix: Check database username/password in connection string")
-    } else if (error.message.includes('ENOTFOUND')) {
+    } else if (error.message.includes("ENOTFOUND")) {
       console.log("🔧 Fix: Check MongoDB Atlas cluster name in connection string")
     }
-    
+
     isConnecting = false
-    
+
     // Retry logic
     if (connectionRetries < MAX_RETRIES) {
       console.log(`🔄 Retrying connection in 3 seconds... (${MAX_RETRIES - connectionRetries} attempts left)`)
-      await new Promise(resolve => setTimeout(resolve, 3000))
+      await new Promise((resolve) => setTimeout(resolve, 3000))
       return await connectToDatabase()
     }
-    
+
     return false
   }
 }
@@ -175,7 +172,7 @@ const connectToDatabase = async () => {
 const initializeDatabase = async () => {
   console.log("🚀 Initializing Database Connection...")
   const connected = await connectToDatabase()
-  
+
   if (connected) {
     console.log("🎉 Database initialization complete!")
   } else {
@@ -184,16 +181,14 @@ const initializeDatabase = async () => {
 }
 
 // Start connection based on environment
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== "test") {
   initializeDatabase().catch(console.error)
 }
 
 // **Database Middleware**
 app.use(async (req, res, next) => {
   // Skip DB check for health endpoints
-  if (req.path.startsWith('/api/health') || 
-      req.path.startsWith('/api/test') || 
-      req.path === '/api/debug') {
+  if (req.path.startsWith("/api/health") || req.path.startsWith("/api/test") || req.path === "/api/debug") {
     return next()
   }
 
@@ -215,6 +210,7 @@ import courseRoutes from "./routes/courseRoutes.js"
 import enrollmentRoutes from "./routes/enrollmentRoutes.js"
 import contentRoutes from "./routes/contentRoutes.js"
 import notificationRoutes from "./routes/notificationRoutes.js"
+import progressRoutes from "./routes/progressRoutes.js"
 
 // Routes
 app.use("/api/users", userRoutes)
@@ -222,26 +218,27 @@ app.use("/api/courses", courseRoutes)
 app.use("/api/enrollments", enrollmentRoutes)
 app.use("/api/content", contentRoutes)
 app.use("/api/notifications", notificationRoutes)
+app.use("/api/progress", progressRoutes)
 
 // **Enhanced Health Check Endpoint**
 app.get("/api/health", async (req, res) => {
   const dbState = mongoose.connection.readyState
   const stateMap = {
-    0: '❌ DISCONNECTED',
-    1: '✅ CONNECTED',
-    2: '🔄 CONNECTING',
-    3: '⏳ DISCONNECTING'
+    0: "❌ DISCONNECTED",
+    1: "✅ CONNECTED",
+    2: "🔄 CONNECTING",
+    3: "⏳ DISCONNECTING",
   }
 
   // Database information
   const dbInfo = {
-    status: stateMap[dbState] || '❓ UNKNOWN',
+    status: stateMap[dbState] || "❓ UNKNOWN",
     readyState: dbState,
     isConnected: dbState === 1,
-    host: mongoose.connection.host || 'N/A',
-    database: mongoose.connection.name || 'N/A',
+    host: mongoose.connection.host || "N/A",
+    database: mongoose.connection.name || "N/A",
     collections: [],
-    ping: 'N/A'
+    ping: "N/A",
   }
 
   // If connected, get more details
@@ -255,7 +252,7 @@ app.get("/api/health", async (req, res) => {
 
       // Get collections
       const collections = await mongoose.connection.db.listCollections().toArray()
-      dbInfo.collections = collections.map(c => c.name)
+      dbInfo.collections = collections.map((c) => c.name)
     } catch (error) {
       dbInfo.ping = `Error: ${error.message}`
     }
@@ -263,29 +260,29 @@ app.get("/api/health", async (req, res) => {
 
   res.json({
     status: "API Server is Running",
-    environment: process.env.NODE_ENV || 'development',
+    environment: process.env.NODE_ENV || "development",
     frontendUrl: "https://biology-trunk-client.vercel.app",
     timestamp: new Date().toISOString(),
     uptime: `${Math.floor(process.uptime())} seconds`,
     serverTime: new Date().toString(),
-    
+
     database: dbInfo,
-    
+
     system: {
       nodeVersion: process.version,
       platform: process.platform,
       memory: {
         rss: `${Math.round(process.memoryUsage().rss / 1024 / 1024)} MB`,
         heapTotal: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)} MB`,
-        heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`
-      }
+        heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
+      },
     },
-    
+
     connectionStats: {
       retries: connectionRetries,
       isConnecting: isConnecting,
-      appName: "Cluster0"
-    }
+      appName: "Cluster0",
+    },
   })
 })
 
@@ -293,9 +290,9 @@ app.get("/api/health", async (req, res) => {
 app.get("/api/test-connection", async (req, res) => {
   try {
     console.log("🧪 Testing MongoDB Connection...")
-    
+
     const startTime = Date.now()
-    
+
     // Ensure connection
     if (mongoose.connection.readyState !== 1) {
       console.log("Not connected, attempting connection...")
@@ -320,17 +317,16 @@ app.get("/api/test-connection", async (req, res) => {
         host: mongoose.connection.host,
         cluster: "Cluster0",
         collectionsCount: collections.length,
-        sampleCollections: collections.slice(0, 5).map(c => c.name)
+        sampleCollections: collections.slice(0, 5).map((c) => c.name),
       },
       connection: {
-        state: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState],
-        retryAttempts: connectionRetries
-      }
+        state: ["disconnected", "connected", "connecting", "disconnecting"][mongoose.connection.readyState],
+        retryAttempts: connectionRetries,
+      },
     })
-
   } catch (error) {
     console.error("Connection test failed:", error)
-    
+
     res.status(500).json({
       success: false,
       error: error.name || "ConnectionError",
@@ -342,8 +338,8 @@ app.get("/api/test-connection", async (req, res) => {
         "1. Verify MONGODB_URI in Vercel environment variables",
         "2. Check MongoDB Atlas → Network Access → Add IP 0.0.0.0/0",
         "3. Verify database user credentials",
-        "4. Check if cluster is running in MongoDB Atlas"
-      ]
+        "4. Check if cluster is running in MongoDB Atlas",
+      ],
     })
   }
 })
@@ -351,7 +347,7 @@ app.get("/api/test-connection", async (req, res) => {
 // **Quick Status Endpoint**
 app.get("/api/status", (req, res) => {
   const isDbConnected = mongoose.connection.readyState === 1
-  
+
   res.json({
     service: "EduTech Backend API",
     status: "operational",
@@ -362,8 +358,8 @@ app.get("/api/status", (req, res) => {
       health: "/api/health",
       testConnection: "/api/test-connection",
       reconnect: "/api/reconnect-db",
-      frontend: "https://biology-trunk-client.vercel.app"
-    }
+      frontend: "https://biology-trunk-client.vercel.app",
+    },
   })
 })
 
@@ -371,19 +367,19 @@ app.get("/api/status", (req, res) => {
 app.get("/api/reconnect-db", async (req, res) => {
   try {
     console.log("Manual reconnect requested...")
-    
+
     // Reset connection retries
     connectionRetries = 0
-    
+
     // Disconnect if already connected
     if (mongoose.connection.readyState === 1) {
       await mongoose.disconnect()
       console.log("Disconnected from MongoDB")
     }
-    
+
     // Connect again
     const connected = await connectToDatabase()
-    
+
     if (connected) {
       res.json({
         success: true,
@@ -391,23 +387,22 @@ app.get("/api/reconnect-db", async (req, res) => {
         frontendUrl: "https://biology-trunk-client.vercel.app",
         connectionState: mongoose.connection.readyState,
         host: mongoose.connection.host,
-        database: mongoose.connection.name
+        database: mongoose.connection.name,
       })
     } else {
       res.status(500).json({
         success: false,
         message: "❌ Failed to reconnect to MongoDB",
         frontendUrl: "https://biology-trunk-client.vercel.app",
-        connectionState: mongoose.connection.readyState
+        connectionState: mongoose.connection.readyState,
       })
     }
-    
   } catch (error) {
     res.status(500).json({
       success: false,
       error: error.message,
       frontendUrl: "https://biology-trunk-client.vercel.app",
-      connectionState: mongoose.connection.readyState
+      connectionState: mongoose.connection.readyState,
     })
   }
 })
@@ -420,14 +415,14 @@ app.get("/api/check-frontend", (req, res) => {
     frontendUrl: "https://biology-trunk-client.vercel.app",
     corsStatus: "enabled",
     allowedMethods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   })
 })
 
 // **Root Endpoint**
 app.get("/", (req, res) => {
   const isDbConnected = mongoose.connection.readyState === 1
-  
+
   res.json({
     message: "🚀 EduTech Backend API",
     version: "1.0.0",
@@ -435,7 +430,7 @@ app.get("/", (req, res) => {
       api: "running",
       database: isDbConnected ? "✅ connected" : "❌ disconnected",
       frontend: "✅ https://biology-trunk-client.vercel.app",
-      environment: process.env.NODE_ENV || "development"
+      environment: process.env.NODE_ENV || "development",
     },
     endpoints: {
       home: "/",
@@ -448,24 +443,25 @@ app.get("/", (req, res) => {
       courses: "/api/courses",
       enrollments: "/api/enrollments",
       content: "/api/content",
-      notifications: "/api/notifications"
+      notifications: "/api/notifications",
+      progress: "/api/progress",
     },
     quickCheck: `Database is ${isDbConnected ? "CONNECTED" : "DISCONNECTED"}`,
     frontendLink: "https://biology-trunk-client.vercel.app",
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   })
 })
 
 // **Error Handling Middleware**
 app.use((err, req, res, next) => {
   console.error("🚨 Server Error:", err.stack)
-  
+
   res.status(500).json({
     error: "Internal Server Error",
     message: err.message,
     databaseStatus: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
     frontendUrl: "https://biology-trunk-client.vercel.app",
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   })
 })
 
@@ -479,8 +475,8 @@ app.use((req, res) => {
       health: "/api/health",
       testConnection: "/api/test-connection",
       status: "/api/status",
-      checkFrontend: "/api/check-frontend"
-    }
+      checkFrontend: "/api/check-frontend",
+    },
   })
 })
 
@@ -488,12 +484,12 @@ app.use((req, res) => {
 export default app
 
 // **Local Development Server**
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
   const PORT = process.env.PORT || 5000
-  
+
   app.listen(PORT, () => {
     console.log(`\n🎯 Server Information:`)
-    console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`)
+    console.log(`   Environment: ${process.env.NODE_ENV || "development"}`)
     console.log(`   Server URL: http://localhost:${PORT}`)
     console.log(`   Frontend URL: https://biology-trunk-client.vercel.app`)
     console.log(`   Health Check: http://localhost:${PORT}/api/health`)

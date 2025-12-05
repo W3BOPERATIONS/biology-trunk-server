@@ -7,7 +7,7 @@ const router = express.Router()
 router.get("/", async (req, res) => {
   try {
     const page = Number.parseInt(req.query.page) || 1
-    const limit = Number.parseInt(req.query.limit) || 100 // Changed from 10 to 100
+    const limit = Number.parseInt(req.query.limit) || 100
     const skip = (page - 1) * limit
 
     const courses = await Course.find().populate("faculty").populate("students").skip(skip).limit(limit)
@@ -62,7 +62,20 @@ router.get("/faculty/:facultyId", async (req, res) => {
 // Create course
 router.post("/", async (req, res) => {
   try {
-    const { title, category, subcategory, description, price, faculty } = req.body
+    const {
+      title,
+      category,
+      subcategory,
+      description,
+      price,
+      faculty,
+      duration,
+      courseLevel,
+      prerequisites,
+      curriculum,
+      whatYouWillLearn,
+      courseIncludes,
+    } = req.body
     const course = new Course({
       title,
       category,
@@ -70,6 +83,12 @@ router.post("/", async (req, res) => {
       description,
       price,
       faculty,
+      duration,
+      courseLevel,
+      prerequisites,
+      curriculum,
+      whatYouWillLearn,
+      courseIncludes,
     })
     await course.save()
     res.status(201).json(course)
@@ -81,8 +100,43 @@ router.post("/", async (req, res) => {
 // Update course
 router.put("/:id", async (req, res) => {
   try {
-    const course = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true })
-    res.json(course)
+    const course = await Course.findById(req.params.id)
+
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" })
+    }
+
+    // Check if the requesting user is the faculty assigned to this course
+    const facultyId = req.body.facultyId || req.user?.id
+    if (course.faculty.toString() !== facultyId) {
+      return res.status(403).json({ message: "You can only update your own courses" })
+    }
+
+    // Allow faculty to update course description and details
+    const allowedUpdates = [
+      "title",
+      "description",
+      "price",
+      "duration",
+      "courseLevel",
+      "prerequisites",
+      "curriculum",
+      "whatYouWillLearn",
+      "courseIncludes",
+    ]
+
+    const updates = {}
+    allowedUpdates.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field]
+      }
+    })
+
+    const updatedCourse = await Course.findByIdAndUpdate(req.params.id, updates, { new: true })
+      .populate("faculty")
+      .populate("students")
+
+    res.json(updatedCourse)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }

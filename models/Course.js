@@ -28,6 +28,34 @@ const CourseSchema = new mongoose.Schema({
       ref: "User",
     },
   ],
+  duration: {
+    type: String,
+    default: "8 weeks",
+  },
+  courseLevel: {
+    type: String,
+    enum: ["Beginner", "Intermediate", "Advanced"],
+    default: "Intermediate",
+  },
+  prerequisites: {
+    type: String,
+    default: "Basic Biology Knowledge",
+  },
+  curriculum: [
+    {
+      module: String,
+      topics: [String],
+    },
+  ],
+  whatYouWillLearn: [String],
+  courseIncludes: {
+    videos: { type: Boolean, default: true },
+    liveLectures: { type: Boolean, default: true },
+    pdfs: { type: Boolean, default: true },
+    quizzes: { type: Boolean, default: true },
+    assignments: { type: Boolean, default: true },
+    certificates: { type: Boolean, default: true },
+  },
   createdAt: {
     type: Date,
     default: Date.now,

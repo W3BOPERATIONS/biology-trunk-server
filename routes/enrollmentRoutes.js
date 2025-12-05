@@ -6,7 +6,6 @@ import User from "../models/User.js" // Added import for User model
 
 const router = express.Router()
 
-// Get all enrollments
 router.get("/", async (req, res) => {
   try {
     const enrollments = await Enrollment.find()
@@ -25,7 +24,6 @@ router.get("/", async (req, res) => {
   }
 })
 
-// Get enrollments by student
 router.get("/student/:studentId", async (req, res) => {
   try {
     const enrollments = await Enrollment.find({ student: req.params.studentId }).populate("course")
@@ -35,7 +33,6 @@ router.get("/student/:studentId", async (req, res) => {
   }
 })
 
-// Get enrollments by course
 router.get("/course/:courseId", async (req, res) => {
   try {
     const enrollments = await Enrollment.find({ course: req.params.courseId }).populate("student")

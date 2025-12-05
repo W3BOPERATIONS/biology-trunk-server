@@ -30,6 +30,23 @@ const EnrollmentSchema = new mongoose.Schema({
       ref: "Content",
     },
   ],
+  payment: {
+    razorpayOrderId: String,
+    razorpayPaymentId: String,
+    razorpaySignature: String,
+    amount: Number,
+    currency: {
+      type: String,
+      default: "INR",
+    },
+    status: {
+      type: String,
+      enum: ["pending", "completed", "failed"],
+      default: "pending",
+    },
+    paidAt: Date,
+    receiptNumber: String,
+  },
 })
 
 const Enrollment = mongoose.model("Enrollment", EnrollmentSchema)

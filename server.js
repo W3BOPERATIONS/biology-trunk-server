@@ -219,6 +219,7 @@ import contentRoutes from "./routes/contentRoutes.js"
 import notificationRoutes from "./routes/notificationRoutes.js"
 import progressRoutes from "./routes/progressRoutes.js"
 import paymentRoutes from "./routes/paymentRoutes.js"
+import contactRoutes from "./routes/contactRoutes.js"
 
 // Routes
 app.use("/api/users", userRoutes)
@@ -228,6 +229,7 @@ app.use("/api/content", contentRoutes)
 app.use("/api/notifications", notificationRoutes)
 app.use("/api/progress", progressRoutes)
 app.use("/api/payments", paymentRoutes)
+app.use("/api/contact", contactRoutes)
 
 // **Enhanced Health Check Endpoint**
 app.get("/api/health", async (req, res) => {
@@ -442,7 +444,7 @@ app.get("/", (req, res) => {
       environment: process.env.NODE_ENV || "development",
     },
     endpoints: {
-      home: "/",
+      root: "/",
       health: "/api/health",
       testConnection: "/api/test-connection",
       status: "/api/status",

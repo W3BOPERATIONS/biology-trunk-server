@@ -26,6 +26,26 @@ router.get("/", async (req, res) => {
   }
 })
 
+router.get("/categories/list", async (req, res) => {
+  try {
+    const categories = await Course.aggregate([
+      {
+        $group: {
+          _id: "$category",
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { _id: 1 },
+      },
+    ])
+
+    res.json(categories)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
 // Get courses by category
 router.get("/category/:category", async (req, res) => {
   try {

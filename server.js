@@ -17,13 +17,12 @@ const app = express()
 
 // **Frontend URLs for CORS**
 const allowedOrigins = [
-  "https://biologoytrunk.in",
-  "https://www.biologoytrunk.in",
+  "https://biologytrunk.in",
+  "https://www.biologytrunk.in",
   "https://biology-trunk-client.vercel.app", // Your deployed frontend
   "http://localhost:3000", // Local development
   "http://localhost:5173", // Vite dev server
   "https://biology-trunk.vercel.app", // Alternative domain
-  "https://*.vercel.app", // All Vercel subdomains
 ]
 
 // **Enhanced CORS Configuration**

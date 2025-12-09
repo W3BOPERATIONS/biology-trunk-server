@@ -17,7 +17,7 @@ const courseData = [
     subcategory: "Mathematics",
     description:
       "Complete mathematics course for Class 9 including Algebra, Geometry, and Trigonometry. Learn fundamental concepts that form the foundation for higher mathematics.",
-    price: 1,
+    price: 1999,
     duration: "12 weeks",
     courseLevel: "Beginner",
     prerequisites: "Class 8 Mathematics",

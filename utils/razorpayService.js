@@ -14,6 +14,12 @@ const getRazorpayInstance = () => {
   console.log("[v0] Initializing Razorpay with:", {
     keyId: keyId ? keyId.substring(0, 10) + "..." : "NOT SET",
     keySecret: keySecret ? "SET" : "NOT SET",
+    mode:
+      keyId && keyId.includes("_live_")
+        ? "🟢 LIVE MODE"
+        : keyId && keyId.includes("_test_")
+          ? "🟡 TEST MODE"
+          : "❓ UNKNOWN",
   })
 
   if (!keyId || !keySecret) {
@@ -51,6 +57,11 @@ export const createRazorpayOrder = async (amount, currency = "INR") => {
     return order
   } catch (error) {
     console.error("[v0] Error creating Razorpay order:", error.message)
+    console.error("[v0] Full error details:", {
+      code: error.code,
+      statusCode: error.statusCode,
+      description: error.description,
+    })
     throw new Error(`Failed to create order: ${error.message}`)
   }
 }
@@ -75,6 +86,7 @@ export const verifyRazorpayPayment = (paymentData) => {
       isValid: isSignatureValid,
       orderId: razorpay_order_id,
       paymentId: razorpay_payment_id,
+      signatureMatch: isSignatureValid ? "✅ Valid" : "❌ Invalid - Check keys",
     })
 
     return isSignatureValid

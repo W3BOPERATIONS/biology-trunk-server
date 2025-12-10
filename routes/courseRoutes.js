@@ -89,6 +89,7 @@ router.post("/", async (req, res) => {
       description,
       price,
       faculty,
+      facultyId,
       duration,
       courseLevel,
       prerequisites,
@@ -96,13 +97,16 @@ router.post("/", async (req, res) => {
       whatYouWillLearn,
       courseIncludes,
     } = req.body
+
+    const facultyField = faculty || facultyId
+
     const course = new Course({
       title,
       category,
       subcategory,
       description,
       price,
-      faculty,
+      faculty: facultyField,
       duration,
       courseLevel,
       prerequisites,
@@ -110,8 +114,9 @@ router.post("/", async (req, res) => {
       whatYouWillLearn,
       courseIncludes,
     })
-    await course.save()
-    res.status(201).json(course)
+    const savedCourse = await course.save()
+    const populatedCourse = await savedCourse.populate("faculty")
+    res.status(201).json(populatedCourse)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -126,14 +131,15 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ message: "Course not found" })
     }
 
-    // Check if the requesting user is the faculty assigned to this course
+    const isAdminRequest = req.body.isAdmin === true
     const facultyId = req.body.facultyId || req.user?.id
-    if (course.faculty.toString() !== facultyId) {
+
+    // If not an admin request, check if the requesting user is the faculty assigned to this course
+    if (!isAdminRequest && course.faculty && course.faculty.toString() !== facultyId) {
       return res.status(403).json({ message: "You can only update your own courses" })
     }
 
-    // Allow faculty to update course description and details
-    const allowedUpdates = [
+    let allowedUpdates = [
       "title",
       "description",
       "price",
@@ -144,6 +150,10 @@ router.put("/:id", async (req, res) => {
       "whatYouWillLearn",
       "courseIncludes",
     ]
+
+    if (isAdminRequest) {
+      allowedUpdates = [...allowedUpdates, "faculty"]
+    }
 
     const updates = {}
     allowedUpdates.forEach((field) => {

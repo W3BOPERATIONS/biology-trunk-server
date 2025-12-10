@@ -44,13 +44,7 @@ router.post("/create-order", async (req, res) => {
     })
   } catch (error) {
     console.error("[v0] Error creating order:", error)
-    res.status(500).json({
-      error: error.message,
-      details: error.code || "RAZORPAY_ERROR",
-      suggestion: error.message.includes("not configured")
-        ? "Please check if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are set correctly in environment variables"
-        : "Check your Razorpay account and ensure live keys are activated if using live mode",
-    })
+    res.status(500).json({ error: error.message })
   }
 })
 
@@ -58,13 +52,6 @@ router.post("/create-order", async (req, res) => {
 router.post("/verify-payment", async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, courseId, studentId } = req.body
-
-    console.log("[v0] Payment verification initiated:", {
-      orderId: razorpay_order_id,
-      paymentId: razorpay_payment_id,
-      courseId: courseId,
-      studentId: studentId,
-    })
 
     // Verify signature
     const isSignatureValid = verifyRazorpayPayment({
@@ -74,13 +61,7 @@ router.post("/verify-payment", async (req, res) => {
     })
 
     if (!isSignatureValid) {
-      console.error("[v0] Signature verification failed - possible key mismatch or tampering")
-      return res.status(400).json({
-        error: "Payment verification failed",
-        details: "Signature mismatch - This could mean the live/test keys don't match between frontend and backend",
-        suggestion:
-          "Ensure both RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are from the same environment (both live or both test)",
-      })
+      return res.status(400).json({ error: "Payment verification failed" })
     }
 
     // Get student and course details
@@ -159,6 +140,7 @@ router.post("/verify-payment", async (req, res) => {
       })
     } catch (emailError) {
       console.error("[v0] Email sending error (non-blocking):", emailError)
+      // Don't fail the enrollment if email fails, just log it
     }
 
     res.json({
@@ -169,14 +151,7 @@ router.post("/verify-payment", async (req, res) => {
     })
   } catch (error) {
     console.error("[v0] Error verifying payment:", error)
-    res.status(500).json({
-      error: error.message,
-      details: "Payment verification encountered an error",
-      debugging: {
-        errorType: error.constructor.name,
-        timestamp: new Date().toISOString(),
-      },
-    })
+    res.status(500).json({ error: error.message })
   }
 })
 

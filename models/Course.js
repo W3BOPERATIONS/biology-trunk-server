@@ -41,6 +41,10 @@ const CourseSchema = new mongoose.Schema({
     type: String,
     default: "Basic Biology Knowledge",
   },
+  demoVideoUrl: {
+    type: String,
+    default: "",
+  },
   curriculum: [
     {
       module: String,

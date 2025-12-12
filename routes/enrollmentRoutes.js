@@ -26,7 +26,13 @@ router.get("/", async (req, res) => {
 
 router.get("/student/:studentId", async (req, res) => {
   try {
-    const enrollments = await Enrollment.find({ student: req.params.studentId }).populate("course")
+    const enrollments = await Enrollment.find({ student: req.params.studentId }).populate({
+      path: "course",
+      populate: {
+        path: "faculty",
+        model: "User",
+      },
+    })
     res.json(enrollments)
   } catch (error) {
     res.status(500).json({ error: error.message })

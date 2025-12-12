@@ -149,6 +149,7 @@ router.put("/:id", async (req, res) => {
       "curriculum",
       "whatYouWillLearn",
       "courseIncludes",
+      "demoVideoUrl",
     ]
 
     if (isAdminRequest) {

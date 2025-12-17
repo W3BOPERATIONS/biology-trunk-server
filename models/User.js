@@ -22,6 +22,12 @@ const UserSchema = new mongoose.Schema({
   phone: String,
   profileImage: String,
   bio: String,
+  resetOtp: {
+    type: String,
+  },
+  resetOtpExpires: {
+    type: Date,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

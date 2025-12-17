@@ -166,4 +166,64 @@ export const sendEnrollmentEmail = async (enrollmentData) => {
   }
 }
 
+// Send OTP email
+export const sendOTPEmail = async (otpData) => {
+  try {
+    const mail = getTransporter()
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: otpData.email,
+      subject: "🔐 Password Reset OTP - Biology Trunk",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
+          <div style="background-color: #2196F3; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0; font-size: 24px;">🔐 Password Reset Request</h1>
+          </div>
+          
+          <div style="padding: 20px; background-color: white; border-radius: 0 0 8px 8px;">
+            <p style="font-size: 16px; color: #333; margin-bottom: 20px;">Hi <strong>${otpData.name}</strong>,</p>
+            
+            <p style="font-size: 14px; color: #555; line-height: 1.6; margin-bottom: 15px;">
+              We received a request to reset your password. Use the OTP below to reset your password:
+            </p>
+            
+            <div style="background-color: #e3f2fd; padding: 20px; text-align: center; margin: 30px 0; border-radius: 8px; border: 2px dashed #2196F3;">
+              <p style="font-size: 14px; color: #666; margin: 0 0 10px 0;">Your OTP Code:</p>
+              <h2 style="margin: 0; color: #2196F3; font-size: 36px; letter-spacing: 8px; font-weight: bold;">${otpData.otp}</h2>
+            </div>
+            
+            <div style="background-color: #fff3cd; padding: 15px; border-left: 4px solid #ff9800; margin: 20px 0; border-radius: 4px;">
+              <p style="margin: 0; font-size: 13px; color: #856404;">
+                ⚠️ <strong>Important:</strong> This OTP will expire in <strong>10 minutes</strong>. If you didn't request this, please ignore this email.
+              </p>
+            </div>
+            
+            <p style="font-size: 14px; color: #555; line-height: 1.6; margin-top: 20px;">
+              For security reasons, never share this OTP with anyone.
+            </p>
+            
+            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+            
+            <p style="font-size: 12px; color: #999; line-height: 1.6;">
+              If you need assistance, please contact our support team at ${process.env.EMAIL_USER}
+            </p>
+            
+            <p style="font-size: 12px; color: #999; margin-top: 20px; text-align: center;">
+              © 2025 Biology.Trunk. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `,
+    }
+
+    const result = await mail.sendMail(mailOptions)
+    console.log("[v0] OTP email sent successfully:", result.messageId)
+    return { success: true, messageId: result.messageId }
+  } catch (error) {
+    console.error("[v0] OTP email sending failed:", error.message)
+    throw new Error(`Failed to send OTP email: ${error.message}`)
+  }
+}
+
 export default getTransporter

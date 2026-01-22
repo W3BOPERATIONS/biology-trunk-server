@@ -49,7 +49,11 @@ router.get("/categories/list", async (req, res) => {
 // Get courses by category
 router.get("/category/:category", async (req, res) => {
   try {
-    const courses = await Course.find({ category: req.params.category }).populate("faculty").populate("students")
+    const categoryParam = req.params.category
+    // Search with case-insensitive regex to handle partial matches
+    const courses = await Course.find({ 
+      category: { $regex: categoryParam, $options: "i" } 
+    }).populate("faculty").populate("students")
     res.json(courses)
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -93,6 +97,7 @@ router.post("/", async (req, res) => {
       duration,
       courseLevel,
       prerequisites,
+      demoVideoUrl,
       curriculum,
       whatYouWillLearn,
       courseIncludes,
@@ -110,6 +115,7 @@ router.post("/", async (req, res) => {
       duration,
       courseLevel,
       prerequisites,
+      demoVideoUrl,
       curriculum,
       whatYouWillLearn,
       courseIncludes,

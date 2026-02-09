@@ -10,6 +10,15 @@ router.post("/register", async (req, res) => {
   try {
     const { name, email, password, role, phone } = req.body
 
+    // Password validation
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({
+        message:
+          "Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+      })
+    }
+
     const existingUser = await User.findOne({ email })
     if (existingUser) {
       return res.status(400).json({ message: "Email already exists" })
@@ -60,14 +69,14 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" })
     }
 
-    if (user.password !== password) {
+    if (await user.matchPassword(password)) {
+      const userResponse = user.toObject()
+      delete userResponse.password
+      res.json({ user: userResponse })
+    } else {
       console.error("[v0] Invalid password for:", email)
       return res.status(401).json({ message: "Invalid email or password" })
     }
-
-    const userResponse = user.toObject()
-    delete userResponse.password
-    res.json({ user: userResponse })
   } catch (error) {
     console.error("[v0] Login error:", error.message)
     res.status(500).json({ error: error.message })
@@ -201,6 +210,15 @@ router.post("/verify-otp-reset-password", async (req, res) => {
       return res.status(400).json({ message: "Email, OTP, and new password are required" })
     }
 
+    // Password validation
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({
+        message:
+          "Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+      })
+    }
+
     const user = await User.findOne({ email })
     if (!user) {
       return res.status(404).json({ message: "User not found" })
@@ -225,6 +243,7 @@ router.post("/verify-otp-reset-password", async (req, res) => {
     }
 
     // Update password and clear OTP
+    // The pre-save hook in User model will handle hashing
     user.password = newPassword
     user.resetOtp = undefined
     user.resetOtpExpires = undefined

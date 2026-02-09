@@ -326,7 +326,7 @@ async function seed() {
     // Create expert faculty with enhanced qualifications
     const expertFaculty = new User({
       name: "Dr. Ramgopal Awasthi",
-      email: "ramgopalawasthi@gmail.com",
+      email: "ramgopalawasthi549@gmail.com",
       password: "Ramgopal@123",
       role: "faculty",
       phone: "9455133830",

@@ -325,11 +325,11 @@ async function seed() {
 
     // Create expert faculty with enhanced qualifications
     const expertFaculty = new User({
-      name: "Dr. Abhishek Jha",
-      email: "abhishekjha2707@gmail.com",
-      password: "Faculty@123",
+      name: "Dr. Ramgopal Awasthi",
+      email: "ramgopalawasthi@gmail.com",
+      password: "Ramgopal@123",
       role: "faculty",
-      phone: "9876543211",
+      phone: "9455133830",
       qualifications: [
         "Ph.D in Chemistry",
         "NET & GATE Qualified",
@@ -348,19 +348,19 @@ async function seed() {
     })
 
     const student = new User({
-      name: "Ajay Jha",
-      email: "ajha97575@gmail.com",
-      password: "Password@123",
+      name: "Ajay Sharma",
+      email: "asharma975@gmail.com",
+      password: "Ajay@123",
       role: "student",
       phone: "9876543210",
     })
 
     const admin = new User({
-      name: "Abhishek",
-      email: "abhishek.flyanytrip@gmail.com",
-      password: "Admin123!",
+      name: "BiologyTrunk Admin",
+      email: "biologytrunk145@gmail.com",
+      password: "Biologytrunk@123",
       role: "admin",
-      phone: "9876543212",
+      phone: "9455133830",
     })
 
     await expertFaculty.save()

@@ -14,6 +14,7 @@ const UserSchema = new mongoose.Schema({
   password: {
     type: String,
     required: true,
+    select: false,
   },
   role: {
     type: String,
@@ -25,9 +26,11 @@ const UserSchema = new mongoose.Schema({
   bio: String,
   resetOtp: {
     type: String,
+    select: false,
   },
   resetOtpExpires: {
     type: Date,
+    select: false,
   },
   createdAt: {
     type: Date,

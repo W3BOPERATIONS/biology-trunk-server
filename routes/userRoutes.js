@@ -1,17 +1,34 @@
 import express from "express"
 import User from "../models/User.js"
+import Course from "../models/Course.js"
 import Notification from "../models/Notification.js"
-import { sendOTPEmail } from "../utils/emailService.js"
+import FacultyInvite from "../models/FacultyInvite.js"
+import StudentOtp from "../models/StudentOtp.js"
+import Enrollment from "../models/Enrollment.js"
+import { sendOTPEmail, sendFacultyInviteEmail, sendStudentOtpEmail } from "../utils/emailService.js"
 
 const router = express.Router()
 
 // Register
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password, role, phone } = req.body
+    const { name, email, password, role, phone, otp } = req.body
+
+    // For students, verify OTP
+    if (role === "student") {
+      if (!otp) {
+        return res.status(400).json({ message: "OTP is required for student registration" })
+      }
+      const otpRecord = await StudentOtp.findOne({ email, otp })
+      if (!otpRecord || otpRecord.expiresAt < new Date()) {
+        return res.status(400).json({ message: "Invalid or expired OTP" })
+      }
+      // Delete OTP after verification
+      await StudentOtp.deleteOne({ email })
+    }
 
     // Password validation
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_+\-={}[\]|:;"'<>,.?/~`]).{6,}$/
     if (!passwordRegex.test(password)) {
       return res.status(400).json({
         message:
@@ -63,7 +80,7 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Email and password are required" })
     }
 
-    const user = await User.findOne({ email })
+    const user = await User.findOne({ email }).select("+password")
     if (!user) {
       console.error("[v0] User not found:", email)
       return res.status(401).json({ message: "Invalid email or password" })
@@ -155,8 +172,23 @@ router.put("/:id", async (req, res) => {
 // Delete user
 router.delete("/:id", async (req, res) => {
   try {
+    const user = await User.findById(req.params.id)
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
+    }
+
+    // Cascading delete: If user is a faculty, delete all their courses
+    if (user.role === "faculty") {
+      await Course.deleteMany({ faculty: user._id })
+    }
+
+    // Cascading delete for students: delete their enrollments
+    if (user.role === "student") {
+      await Enrollment.deleteMany({ student: user._id })
+    }
+
     await User.findByIdAndDelete(req.params.id)
-    res.json({ message: "User deleted" })
+    res.json({ message: "User deleted successfully" })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -211,7 +243,7 @@ router.post("/verify-otp-reset-password", async (req, res) => {
     }
 
     // Password validation
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_+\-={}[\]|:;"'<>,.?/~`]).{6,}$/
     if (!passwordRegex.test(newPassword)) {
       return res.status(400).json({
         message:
@@ -219,7 +251,7 @@ router.post("/verify-otp-reset-password", async (req, res) => {
       })
     }
 
-    const user = await User.findOne({ email })
+    const user = await User.findOne({ email }).select("+resetOtp +resetOtpExpires")
     if (!user) {
       return res.status(404).json({ message: "User not found" })
     }
@@ -252,6 +284,138 @@ router.post("/verify-otp-reset-password", async (req, res) => {
     res.json({ message: "Password reset successfully. You can now login with your new password" })
   } catch (error) {
     console.error("[v0] Verify OTP error:", error.message)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// --- Admin Faculty Management Routes ---
+
+// 1. Send OTP to Faculty Email (Admin only)
+router.post("/faculty/send-otp", async (req, res) => {
+  try {
+    const { email, adminId } = req.body
+
+    if (!email) {
+      return res.status(400).json({ message: "Faculty email is required" })
+    }
+
+    // Check if email already exists in User model
+    const existingUser = await User.findOne({ email })
+    if (existingUser) {
+      return res.status(400).json({ message: "A user with this email already exists" })
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString()
+
+    // Save or update invite
+    await FacultyInvite.findOneAndUpdate(
+      { email },
+      { otp, expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
+      { upsert: true, new: true },
+    )
+
+    // Send email
+    await sendFacultyInviteEmail(email, otp)
+
+    res.json({ message: `Invitation OTP sent to ${email}` })
+  } catch (error) {
+    console.error("[v0] Faculty invite error:", error.message)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// 2. Verify OTP for Faculty (Admin only)
+router.post("/faculty/verify-otp", async (req, res) => {
+  try {
+    const { email, otp } = req.body
+
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" })
+    }
+
+    const invite = await FacultyInvite.findOne({ email })
+
+    if (!invite) {
+      return res.status(400).json({ message: "No invitation found for this email" })
+    }
+
+    if (invite.expiresAt < new Date()) {
+      await FacultyInvite.deleteOne({ email })
+      return res.status(400).json({ message: "OTP has expired" })
+    }
+
+    if (invite.otp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP" })
+    }
+
+    res.json({ message: "OTP verified correctly", verified: true })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// 3. Complete Faculty Creation (Admin only)
+router.post("/faculty/register-by-admin", async (req, res) => {
+  try {
+    const { name, email, password, phone, otp } = req.body
+
+    // Verify OTP one last time to be safe (or check if verified in session, but stateless is better)
+    const invite = await FacultyInvite.findOne({ email, otp })
+    if (!invite || invite.expiresAt < new Date()) {
+      return res.status(400).json({ message: "Session expired or invalid. Please verify OTP again." })
+    }
+
+    // Create user
+    const user = new User({
+      name,
+      email,
+      password,
+      role: "faculty",
+      phone,
+    })
+
+    await user.save()
+
+    // Clear invite
+    await FacultyInvite.deleteOne({ email })
+
+    res.status(201).json({ message: "Faculty account created successfully", user: { name, email, role: "faculty" } })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Student OTP Route
+router.post("/student/send-otp", async (req, res) => {
+  try {
+    const { email } = req.body
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" })
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email })
+    if (existingUser) {
+      return res.status(400).json({ message: "Email already registered" })
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString()
+
+    // Save/Update OTP
+    await StudentOtp.findOneAndUpdate(
+      { email },
+      { otp, expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
+      { upsert: true, new: true },
+    )
+
+    // Send Email
+    await sendStudentOtpEmail(email, otp)
+
+    res.json({ message: "Verification OTP sent to your email" })
+  } catch (error) {
+    console.error("Student OTP Error:", error.message)
     res.status(500).json({ error: error.message })
   }
 })

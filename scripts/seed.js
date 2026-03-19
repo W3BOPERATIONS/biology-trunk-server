@@ -315,7 +315,7 @@ const courseData = [
 
 async function seed() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/edutech")
+    await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/biologytrunk")
     console.log("MongoDB connected for seeding")
 
     // Clear existing data

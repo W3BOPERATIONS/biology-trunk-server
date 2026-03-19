@@ -105,21 +105,25 @@ router.post("/", async (req, res) => {
 
     const facultyField = faculty || facultyId
 
-    const course = new Course({
+    // Clean up empty strings to avoid validation errors for enums or to let defaults apply
+    const cleanedData = {
       title,
       category,
       subcategory,
       description,
-      price,
+      price: price || 0,
       faculty: facultyField,
-      duration,
-      courseLevel,
       prerequisites,
       demoVideoUrl,
-      curriculum,
-      whatYouWillLearn,
-      courseIncludes,
-    })
+      curriculum: curriculum || [],
+      whatYouWillLearn: whatYouWillLearn || [],
+      courseIncludes: courseIncludes || {},
+    }
+
+    if (duration && duration.trim()) cleanedData.duration = duration.trim()
+    if (courseLevel && courseLevel.trim()) cleanedData.courseLevel = courseLevel.trim()
+
+    const course = new Course(cleanedData)
     const savedCourse = await course.save()
     const populatedCourse = await savedCourse.populate("faculty")
     res.status(201).json(populatedCourse)

@@ -5,11 +5,13 @@ const EnrollmentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: true,
+    index: true,
   },
   course: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Course",
     required: true,
+    index: true,
   },
   enrolledAt: {
     type: Date,

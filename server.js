@@ -2,19 +2,20 @@ import express from "express"
 import mongoose from "mongoose"
 import cors from "cors"
 import dotenv from "dotenv"
+import helmet from "helmet"
+import compression from "compression"
+import rateLimit from "express-rate-limit"
+import mongoSanitize from "express-mongo-sanitize"
+import hpp from "hpp"
 
 // Load environment variables
 dotenv.config()
 
-console.log("🔧 Environment Variables Check:")
-console.log("  RAZORPAY_KEY_ID:", process.env.RAZORPAY_KEY_ID ? "✓ SET" : "✗ NOT SET")
-console.log("  RAZORPAY_KEY_SECRET:", process.env.RAZORPAY_KEY_SECRET ? "✓ SET" : "✗ NOT SET")
-console.log("  EMAIL_USER:", process.env.EMAIL_USER ? "✓ SET" : "✗ NOT SET")
-console.log("  EMAIL_APP_PASSWORD:", process.env.EMAIL_APP_PASSWORD ? "✓ SET" : "✗ NOT SET")
-console.log("  FRONTEND_URL:", process.env.FRONTEND_URL || "http://localhost:5173")
-
 const app = express()
 
+// **Security Middlewares**
+
+// 1. CORS MUST be first to ensure all responses (including errors/limits) have headers
 // **Frontend URLs for CORS**
 const allowedOrigins = [
   "https://biologytrunk.in",
@@ -23,18 +24,15 @@ const allowedOrigins = [
   "http://localhost:3000", // Local development
   "http://localhost:5173", // Vite dev server
   "https://biology-trunk.vercel.app", // Alternative domain
+  "https://biology-trunk-bt.vercel.app",
 ]
 
-// **Enhanced CORS Configuration**
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true)
-
     if (
       allowedOrigins.some((allowedOrigin) => {
         if (allowedOrigin.includes("*")) {
-          // Handle wildcard subdomains
           const regex = new RegExp(allowedOrigin.replace("*", ".*"))
           return regex.test(origin)
         }
@@ -43,24 +41,46 @@ const corsOptions = {
     ) {
       callback(null, true)
     } else {
-      console.log(`🚫 CORS blocked: ${origin}`)
       callback(new Error("Not allowed by CORS"))
     }
   },
-  credentials: true, // Allow cookies/sessions
+  credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
   exposedHeaders: ["Content-Length", "Authorization"],
-  maxAge: 86400, // 24 hours
+  maxAge: 86400,
 }
-
-// Middleware
 app.use(cors(corsOptions))
-app.use(express.json())
-app.use(express.urlencoded({ limit: "50mb", extended: true }))
 
-// **Add CORS headers for preflight requests**
-app.options("*", cors(corsOptions))
+// 2. Helmet for security headers
+app.use(helmet({
+  contentSecurityPolicy: false, 
+}))
+
+// 3. Rate Limiting (Increased for development/active use)
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500, // Increased to 500 to avoid blocking during dev/testing
+  message: {
+    message: "Too many requests from this IP, please try again later",
+    status: 429
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+app.use("/api/", limiter)
+
+// 4. Mongo Sanitize to prevent NoSQL injection
+app.use(mongoSanitize())
+
+// 5. HPP to prevent HTTP Parameter Pollution
+app.use(hpp())
+
+// 6. Compression for performance
+app.use(compression())
+
+app.use(express.json({ limit: "10kb" }))
+app.use(express.urlencoded({ limit: "50mb", extended: true }))
 
 // **Log environment variables (safely)**
 console.log("🔧 Environment Configuration:")
@@ -361,7 +381,7 @@ app.get("/api/status", (req, res) => {
   const isDbConnected = mongoose.connection.readyState === 1
 
   res.json({
-    service: "EduTech Backend API",
+    service: "Biology.Trunk Backend API",
     status: "operational",
     database: isDbConnected ? "connected" : "disconnected",
     frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
@@ -436,7 +456,7 @@ app.get("/", (req, res) => {
   const isDbConnected = mongoose.connection.readyState === 1
 
   res.json({
-    message: "🚀 EduTech Backend API",
+    message: "🚀 Biology.Trunk Backend API",
     version: "1.0.0",
     status: {
       api: "running",

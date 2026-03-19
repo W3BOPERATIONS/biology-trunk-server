@@ -8,6 +8,7 @@ const CourseSchema = new mongoose.Schema({
   category: {
     type: String,
     required: true,
+    index: true,
   },
   subcategory: String,
   description: String,
@@ -18,6 +19,7 @@ const CourseSchema = new mongoose.Schema({
   faculty: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
+    index: true,
   },
   assignedTo: {
     type: String,

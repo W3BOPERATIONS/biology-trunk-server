@@ -1,7 +1,27 @@
 import express from "express"
 import Course from "../models/Course.js"
+import User from "../models/User.js"
 
 const router = express.Router()
+
+// Get course & user statistics for home page hero
+router.get("/stats", async (req, res) => {
+  try {
+    const totalCourses = await Course.countDocuments()
+    const premiumCourses = await Course.countDocuments({ price: { $gt: 0 } })
+    const totalFaculty = await User.countDocuments({ role: "faculty" })
+    const totalStudents = await User.countDocuments({ role: "student" })
+
+    res.json({
+      totalCourses,
+      premiumCourses,
+      totalFaculty,
+      totalStudents,
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
 
 // Get all courses with pagination support
 router.get("/", async (req, res) => {
@@ -25,6 +45,7 @@ router.get("/", async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 })
+
 
 router.get("/categories/list", async (req, res) => {
   try {

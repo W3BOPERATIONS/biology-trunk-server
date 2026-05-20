@@ -7,6 +7,7 @@ import compression from "compression"
 import rateLimit from "express-rate-limit"
 import mongoSanitize from "express-mongo-sanitize"
 import hpp from "hpp"
+import xssClean from "xss-clean"
 
 // Load environment variables
 dotenv.config()
@@ -26,6 +27,10 @@ const allowedOrigins = [
   "https://biology-trunk.vercel.app", // Alternative domain
   "https://biology-trunk-bt.vercel.app",
 ]
+
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL)
+}
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -52,9 +57,19 @@ const corsOptions = {
 }
 app.use(cors(corsOptions))
 
-// 2. Helmet for security headers
+// 2. Helmet for security headers (configured with a dynamic/safe CSP policy)
 app.use(helmet({
-  contentSecurityPolicy: false, 
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://checkout.razorpay.com"],
+      frameSrc: ["'self'", "https://api.razorpay.com", "https://checkout.razorpay.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://cdnjs.cloudflare.com", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https://images.unsplash.com", "https://biologytrunk.in", "https://www.biologytrunk.in", "https://biology-trunk-client.vercel.app"],
+      connectSrc: ["'self'", "https://api.razorpay.com", "https://checkout.razorpay.com", "http://localhost:5000", "http://localhost:5173", "https://biology-trunk-client.vercel.app"]
+    }
+  }
 }))
 
 // 3. Rate Limiting (Increased for development/active use)
@@ -73,10 +88,13 @@ app.use("/api/", limiter)
 // 4. Mongo Sanitize to prevent NoSQL injection
 app.use(mongoSanitize())
 
-// 5. HPP to prevent HTTP Parameter Pollution
+// 5. XSS Clean to sanitize user input in request bodies, query strings, and params
+app.use(xssClean())
+
+// 6. HPP to prevent HTTP Parameter Pollution
 app.use(hpp())
 
-// 6. Compression for performance
+// 7. Compression for performance
 app.use(compression())
 
 app.use(express.json({ limit: "10kb" }))
@@ -481,9 +499,11 @@ app.get("/", (req, res) => {
 app.use((err, req, res, next) => {
   console.error("🚨 Server Error:", err.stack)
 
+  const isProduction = process.env.NODE_ENV === "production"
+
   res.status(500).json({
     error: "Internal Server Error",
-    message: err.message,
+    message: isProduction ? "An unexpected error occurred. Please try again later." : err.message,
     databaseStatus: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
     frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
     timestamp: new Date().toISOString(),

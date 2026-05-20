@@ -100,17 +100,7 @@ app.use(compression())
 app.use(express.json({ limit: "10kb" }))
 app.use(express.urlencoded({ limit: "50mb", extended: true }))
 
-// **Log environment variables (safely)**
-console.log("🔧 Environment Configuration:")
-console.log("NODE_ENV:", process.env.NODE_ENV)
-console.log("PORT:", process.env.PORT)
-console.log("Frontend URL:", "https://biology-trunk-client.vercel.app")
-console.log(
-  "MONGODB_URI:",
-  process.env.MONGODB_URI
-    ? process.env.MONGODB_URI.replace(/(mongodb\+srv:\/\/)([^:]+):([^@]+)@/, "$1***:***@")
-    : "Not set",
-)
+// **Environment Configuration loaded**
 
 // **MongoDB Connection Handler**
 let isConnecting = false
@@ -163,9 +153,6 @@ const connectToDatabase = async () => {
     await mongoose.connect(process.env.MONGODB_URI, connectionOptions)
 
     console.log("✅ MongoDB Connected Successfully!")
-    console.log(`📊 Database: ${mongoose.connection.name}`)
-    console.log(`🔗 Host: ${mongoose.connection.host}`)
-    console.log(`👤 User: ${mongoose.connection.user || "N/A"}`)
 
     // Set up connection event handlers
     mongoose.connection.on("connected", () => {
@@ -216,13 +203,9 @@ const connectToDatabase = async () => {
 
 // **Initialize Database Connection**
 const initializeDatabase = async () => {
-  console.log("🚀 Initializing Database Connection...")
   const connected = await connectToDatabase()
-
-  if (connected) {
-    console.log("🎉 Database initialization complete!")
-  } else {
-    console.log("❌ Database initialization failed after maximum retries")
+  if (!connected) {
+    console.error("❌ Database initialization failed after maximum retries")
   }
 }
 
